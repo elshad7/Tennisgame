@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>💖 Nurana vs Elshad 💖</title>
+
+<style>
+body {
+    margin: 0;
+    background: black;
+    color: #0ff;
+    font-family: Arial;
+    text-align: center;
+}
+
+h1 {
+    color: #ff00ff;
+    text-shadow: 0 0 15px #ff00ff;
+}
+
+.menu {
+    margin-top: 40px;
+}
+
+button {
+    padding: 10px 20px;
+    margin: 8px;
+    background: black;
+    border: 2px solid #0ff;
+    color: #0ff;
+    cursor: pointer;
+}
+
+canvas {
+    display: none;
+    margin: auto;
+    border: 2px solid #0ff;
+    touch-action: none;
+}
+
+#score {
+    margin-top: 10px;
+    font-size: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>💖 Nurana vs Elshad 💖</h1>
+
+<div class="menu" id="menu">
+    <p>Select Player:</p>
+    <button onclick="selectPlayer('left')">Nurana</button>
+    <button onclick="selectPlayer('right')">Elshad</button>
+
+    <p>Select Difficulty:</p>
+    <button onclick="setDifficulty('easy')">Easy</button>
+    <button onclick="setDifficulty('medium')">Medium</button>
+    <button onclick="setDifficulty('hard')">Hard</button>
+
+    <br>
+    <button onclick="startGame()">Start Game</button>
+</div>
+
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<div id="score"></div>
+
+<div id="endScreen" style="display:none;">
+    <h2 id="winnerText"></h2>
+    <button onclick="restart()">Play Again</button>
+    <button onclick="backToMenu()">Change Settings</button>
+</div>
+
+<script>
+let canvas = document.getElementById("gameCanvas");
+let ctx = canvas.getContext("2d");
+
+let player = null;
+let difficulty = "easy";
+let animationId;
+
+let paddleHeight = 80;
+let paddleWidth = 10;
+
+let leftPaddle, rightPaddle;
+let ball, leftScore, rightScore;
+
+let botSpeed = 2;
+
+function selectPlayer(side) {
+    player = side;
+}
+
+function setDifficulty(level) {
+    difficulty = level;
+    if (level === "easy") botSpeed = 2;
+    if (level === "medium") botSpeed = 4;
+    if (level === "hard") botSpeed = 6;
+}
+
+function startGame() {
+    if (!player) return alert("Select player!");
+
+    document.getElementById("menu").style.display = "none";
+    canvas.style.display = "block";
+    document.getElementById("score").style.display = "block";
+
+    resetGame();
+    gameLoop();
+}
+
+function resetGame() {
+    cancelAnimationFrame(animationId);
+
+    ball = resetBall();
+
+    leftScore = 0;
+    rightScore = 0;
+
+    leftPaddle = 160;
+    rightPaddle = 160;
+}
+
+function resetBall() {
+    let direction = Math.random() > 0.5 ? 1 : -1;
+    return {
+        x: 300,
+        y: 200,
+        dx: 4 * direction,
+        dy: (Math.random() - 0.5) * 6
+    };
+}
+
+function draw() {
+    ctx.clearRect(0,0,600,400);
+
+    ctx.fillStyle = "#0ff";
+
+    ctx.fillRect(0, leftPaddle, paddleWidth, paddleHeight);
+    ctx.fillRect(590, rightPaddle, paddleWidth, paddleHeight);
+
+    // ball
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#ff00ff";
+    ctx.fillStyle = "#ff00ff";
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, 8, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    document.getElementById("score").innerText =
+        `Nurana: ${leftScore} | Elshad: ${rightScore}`;
+}
+
+function update() {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    // wall bounce
+    if (ball.y <= 0 || ball.y >= 400) {
+        ball.dy *= -1;
+    }
+
+    // paddle collision with angle
+    if (ball.x < 10 &&
+        ball.y > leftPaddle &&
+        ball.y < leftPaddle + paddleHeight) {
+
+        let angle = (ball.y - (leftPaddle + paddleHeight/2)) / 30;
+        ball.dx *= -1;
+        ball.dy = angle * 5;
+    }
+
+    if (ball.x > 580 &&
+        ball.y > rightPaddle &&
+        ball.y < rightPaddle + paddleHeight) {
+
+        let angle = (ball.y - (rightPaddle + paddleHeight/2)) / 30;
+        ball.dx *= -1;
+        ball.dy = angle * 5;
+    }
+
+    // scoring
+    if (ball.x < 0) {
+        rightScore++;
+        ball = resetBall();
+    }
+
+    if (ball.x > 600) {
+        leftScore++;
+        ball = resetBall();
+    }
+
+    // win
+    if (leftScore === 3 || rightScore === 3) {
+        endGame();
+        return;
+    }
+
+    // bot movement (smoothed)
+    if (player === "left") {
+        rightPaddle += (ball.y - (rightPaddle + paddleHeight/2)) * 0.08 * botSpeed;
+    } else {
+        leftPaddle += (ball.y - (leftPaddle + paddleHeight/2)) * 0.08 * botSpeed;
+    }
+
+    // clamp paddles
+    leftPaddle = Math.max(0, Math.min(400 - paddleHeight, leftPaddle));
+    rightPaddle = Math.max(0, Math.min(400 - paddleHeight, rightPaddle));
+}
+
+function gameLoop() {
+    update();
+    draw();
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+// DESKTOP control
+canvas.addEventListener("mousemove", e => {
+    let rect = canvas.getBoundingClientRect();
+    let y = e.clientY - rect.top;
+
+    movePlayer(y);
+});
+
+// MOBILE control
+canvas.addEventListener("touchmove", e => {
+    let rect = canvas.getBoundingClientRect();
+    let y = e.touches[0].clientY - rect.top;
+
+    movePlayer(y);
+    e.preventDefault();
+});
+
+function movePlayer(y) {
+    if (player === "left") {
+        leftPaddle = y - paddleHeight/2;
+    } else {
+        rightPaddle = y - paddleHeight/2;
+    }
+}
+
+function endGame() {
+    cancelAnimationFrame(animationId);
+
+    canvas.style.display = "none";
+    document.getElementById("endScreen").style.display = "block";
+
+    let winner = leftScore === 3 ? "Nurana 💖" : "Elshad 💖";
+    document.getElementById("winnerText").innerText = winner + " Wins!";
+}
+
+function restart() {
+    document.getElementById("endScreen").style.display = "none";
+    canvas.style.display = "block";
+
+    resetGame();
+    gameLoop();
+}
+
+function backToMenu() {
+    cancelAnimationFrame(animationId);
+
+    document.getElementById("endScreen").style.display = "none";
+    document.getElementById("menu").style.display = "block";
+    canvas.style.display = "none";
+}
+</script>
+
+</body>
+</html>
